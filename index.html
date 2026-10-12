@@ -80,6 +80,24 @@
       font-weight: 650;
     }
 
+    .pull-indicator {
+      position: fixed;
+      top: max(8px, env(safe-area-inset-top));
+      left: 50%;
+      z-index: 20;
+      transform: translate(-50%, -150%);
+      opacity: 0;
+      padding: 9px 14px;
+      border-radius: 999px;
+      background: #203f30;
+      color: #fff;
+      font-size: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .16);
+      transition: transform .15s ease, opacity .15s ease;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
     .hero {
       background: #203f30;
       color: white;
@@ -388,6 +406,51 @@
       transform: translate(-50%, 0);
     }
 
+    .forecast-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 18px 16px;
+      margin-bottom: 26px;
+    }
+
+    .forecast-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .forecast-value {
+      font-size: clamp(24px, 6vw, 30px);
+      font-weight: 750;
+      letter-spacing: -1px;
+      overflow-wrap: anywhere;
+    }
+
+    .forecast-status {
+      border-radius: 12px;
+      padding: 8px 10px;
+      background: var(--green-bg);
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      max-width: 48%;
+    }
+
+    .forecast-status.behind {
+      background: #f9e8e6;
+      color: var(--red);
+    }
+
+    .forecast-detail {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      margin-top: 12px;
+    }
+
     @media (min-width: 600px) {
       body { padding: 20px 0; }
       .app {
@@ -448,6 +511,21 @@
         <div class="stat-value" id="remainingDays">—</div>
         <div class="stat-note" id="targetDateNote">До целевой даты</div>
       </div>
+    </section>
+
+    <section class="forecast-card">
+      <div class="section-head">
+        <div class="section-title">Прогноз к цели</div>
+        <div class="days" id="forecastPeriod">По расходам за 7 дней</div>
+      </div>
+      <div class="forecast-main">
+        <div>
+          <div class="stat-label">Ожидаемый баланс</div>
+          <div class="forecast-value" id="forecastBalance">—</div>
+        </div>
+        <div class="forecast-status" id="forecastStatus">Рассчитываем прогноз…</div>
+      </div>
+      <div class="forecast-detail" id="forecastDetail">Средние расходы за последние 7 дней: —</div>
     </section>
 
     <section>
@@ -531,7 +609,10 @@
       savingsGoal: 1500,
       availableBudget: 1000,
       remainingDays: 25,
-      dailyLimit: 40
+      dailyLimit: 40,
+      averageDailyExpenses7d: 0,
+      forecastBalance: 2500,
+      forecastOnTrack: true
     };
 
     function money(value) {
@@ -565,6 +646,27 @@
       $('available').textContent = `${money(data.availableBudget)} ${currency}`;
       $('remainingDays').textContent = data.remainingDays;
       $('targetDateNote').textContent = `До ${formatDate(data.targetDate)}`;
+
+      const forecastBalance = Number(data.forecastBalance);
+      const averageExpenses = Number(data.averageDailyExpenses7d);
+      if (Number.isFinite(forecastBalance) && Number.isFinite(averageExpenses)) {
+        $('forecastBalance').textContent = `${money(forecastBalance)} ${currency}`;
+        $('forecastDetail').textContent =
+          `Средние расходы за последние 7 дней: ${money(averageExpenses)} ${currency} в день. Прогноз не учитывает будущие доходы.`;
+
+        const onTrack = typeof data.forecastOnTrack === 'boolean'
+          ? data.forecastOnTrack
+          : forecastBalance >= data.savingsGoal;
+        $('forecastStatus').textContent = onTrack
+          ? 'Цель по плану'
+          : `Риск недобора: ${money(Math.max(0, data.savingsGoal - forecastBalance))} ${currency}`;
+        $('forecastStatus').classList.toggle('behind', !onTrack);
+      } else {
+        $('forecastBalance').textContent = '—';
+        $('forecastDetail').textContent = 'Прогноз появится после обновления данных.';
+        $('forecastStatus').textContent = 'Нет данных';
+        $('forecastStatus').classList.remove('behind');
+      }
 
       const goalProgress = data.balance > 0
         ? Math.min(100, Math.max(0, data.savingsGoal / data.balance * 100))
